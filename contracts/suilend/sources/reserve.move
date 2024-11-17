@@ -1,6 +1,7 @@
 /// The reserve module holds the coins of a certain type for a given lending market. 
 module suilend::reserve {
     // === Imports ===
+    use sui::sui::SUI;
     use std::type_name::{Self, TypeName};
     use sui::dynamic_field::{Self};
     use sui::balance::{Self, Balance, Supply};
@@ -12,7 +13,7 @@ module suilend::reserve {
     use suilend::oracles::{Self};
     use suilend::decimal::{Decimal, Self, add, sub, mul, div, eq, floor, pow, le, ceil, min, max, saturating_sub};
     use sui::clock::{Self, Clock};
-    use sui::coin::{Self, CoinMetadata};
+    use sui::coin::{Self, CoinMetadata, TreasuryCap};
     use sui::math::{Self};
     use pyth::price_identifier::{PriceIdentifier};
     use pyth::price_info::{PriceInfoObject};
@@ -31,6 +32,9 @@ module suilend::reserve {
         liquidation_bonus
     };
     use suilend::liquidity_mining::{Self, PoolRewardManager};
+    use suilend::staker::{Self, Staker};
+    use sui_system::sui_system::{SuiSystemState};
+    use sprungsui::sprungsui::SPRUNGSUI;
 
     // === Errors ===
     const EPriceStale: u64 = 0;
@@ -40,7 +44,9 @@ module suilend::reserve {
     const EInvalidPrice: u64 = 4;
     const EMinAvailableAmountViolated: u64 = 5;
     const EInvalidRepayBalance: u64 = 6;
-
+    const EWrongType: u64 = 7;
+    const EStakerAlreadyInitialized: u64 = 8;
+    const EStakerNotInitialized: u64 = 9;
     // === Constants ===
     const PRICE_STALENESS_THRESHOLD_S: u64 = 0;
     // to prevent certain rounding bug attacks, we make sure that X amount of the underlying token amount
@@ -85,8 +91,15 @@ module suilend::reserve {
     /// the underlying token + any interest earned.
     public struct CToken<phantom P, phantom T> has drop {}
 
+    /// A request to withdraw liquidity from the reserve. This is a hot potato object.
+    public struct LiquidityRequest<phantom P, phantom T> {
+        amount: u64, // includes fee
+        fee: u64,
+    }
+
     // === Dynamic Field Keys ===
     public struct BalanceKey has copy, drop, store {}
+    public struct StakerKey has copy, drop, store {}
 
     /// Balances are stored in a dynamic field to avoid typing the Reserve with CoinType
     public struct Balances<phantom P, phantom T> has store {
@@ -137,13 +150,19 @@ module suilend::reserve {
         price_last_update_timestamp_s: u64,
     }
 
+    public struct ClaimStakingRewardsEvent has drop, copy {
+        lending_market_id: address,
+        coin_type: TypeName,
+        reserve_id: address,
+        amount: u64,
+    }
 
     // === Conpublic structor ===
     public(package) fun create_reserve<P, T>(
         lending_market_id: ID,
         config: ReserveConfig, 
         array_index: u64,
-        coin_metadata: &CoinMetadata<T>,
+        mint_decimals: u8,
         price_info_obj: &PriceInfoObject, 
         clock: &Clock, 
         ctx: &mut TxContext
@@ -158,7 +177,7 @@ module suilend::reserve {
             array_index,
             coin_type: type_name::get<T>(),
             config: cell::new(config),
-            mint_decimals: coin::get_decimals(coin_metadata),
+            mint_decimals,
             price_identifier,
             price: option::extract(&mut price_decimal),
             smoothed_price: smoothed_price_decimal,
@@ -472,6 +491,17 @@ module suilend::reserve {
         &balances.ctoken_fees
     }
 
+    public(package) fun liquidity_request_amount<P, T>(request: &LiquidityRequest<P, T>): u64 {
+        request.amount
+    }
+    public(package) fun liquidity_request_fee<P, T>(request: &LiquidityRequest<P, T>): u64 {
+        request.fee
+    }
+
+    public fun staker<P, S>(reserve: &Reserve<P>): &Staker<S> {
+        dynamic_field::borrow(&reserve.id, StakerKey {})
+    }
+
     // === Public-Mutative Functions
     public(package) fun deposits_pool_reward_manager_mut<P>(reserve: &mut Reserve<P>): &mut PoolRewardManager {
         &mut reserve.deposits_pool_reward_manager
@@ -656,7 +686,7 @@ module suilend::reserve {
     public(package) fun redeem_ctokens<P, T>(
         reserve: &mut Reserve<P>, 
         ctokens: Balance<CToken<P, T>>
-    ): Balance<T> {
+    ): LiquidityRequest<P, T> {
         let ctoken_ratio = ctoken_ratio(reserve);
         let liquidity_amount = floor(mul(
             decimal::from(balance::value(&ctokens)),
@@ -678,14 +708,117 @@ module suilend::reserve {
         );
 
         balance::decrease_supply(&mut balances.ctoken_supply, ctokens);
-        balance::split(&mut balances.available_amount, liquidity_amount)
+
+        LiquidityRequest<P, T> {
+            amount: liquidity_amount,
+            fee: 0
+        }
+    }
+
+    public(package) fun fulfill_liquidity_request<P, T>(
+        reserve: &mut Reserve<P>,
+        request: LiquidityRequest<P, T>,
+    ): Balance<T> {
+        let LiquidityRequest { amount, fee } = request;
+
+        let balances: &mut Balances<P, T> = dynamic_field::borrow_mut(
+            &mut reserve.id, 
+            BalanceKey {}
+        );
+
+        let mut liquidity = balance::split(&mut balances.available_amount, amount);
+        balance::join(&mut balances.fees, balance::split(&mut liquidity, fee));
+
+        liquidity
+    }
+
+    public(package) fun init_staker<P, S: drop>(
+        reserve: &mut Reserve<P>,
+        treasury_cap: TreasuryCap<S>,
+        ctx: &mut TxContext
+    ) {
+        assert!(!dynamic_field::exists_(&reserve.id, StakerKey {}), EStakerAlreadyInitialized);
+        assert!(type_name::get<S>() == type_name::get<SPRUNGSUI>(), EWrongType);
+
+        let staker = staker::create_staker(treasury_cap, ctx);
+        dynamic_field::add(&mut reserve.id, StakerKey {}, staker);
+    }
+
+    public(package) fun rebalance_staker<P>(
+        reserve: &mut Reserve<P>,
+        system_state: &mut SuiSystemState,
+        ctx: &mut TxContext
+    ) {
+        assert!(dynamic_field::exists_(&reserve.id, StakerKey {}), EStakerNotInitialized);
+        let balances: &mut Balances<P, SUI> = dynamic_field::borrow_mut(
+            &mut reserve.id, 
+            BalanceKey {}
+        );
+        let sui = balance::withdraw_all(&mut balances.available_amount);
+
+        let staker: &mut Staker<SPRUNGSUI> = dynamic_field::borrow_mut(&mut reserve.id, StakerKey {});
+
+        staker::deposit(staker, sui);
+        staker::rebalance(staker, system_state, ctx);
+
+        let fees = staker::claim_fees(staker, system_state, ctx);
+        if (balance::value(&fees) > 0) {
+            event::emit(ClaimStakingRewardsEvent {
+                lending_market_id: object::id_to_address(&reserve.lending_market_id),
+                coin_type: reserve.coin_type,
+                reserve_id: object::uid_to_address(&reserve.id),
+                amount: balance::value(&fees),
+            });
+
+            let balances: &mut Balances<P, SUI> = dynamic_field::borrow_mut(
+                &mut reserve.id,
+                BalanceKey {}
+            );
+
+            balance::join(&mut balances.fees, fees);
+        }
+        else {
+            balance::destroy_zero(fees);
+        };
+    }
+
+    public(package) fun unstake_sui_from_staker<P>(
+        reserve: &mut Reserve<P>,
+        liquidity_request: &LiquidityRequest<P, SUI>,
+        system_state: &mut SuiSystemState,
+        ctx: &mut TxContext
+    ) {
+        assert!(reserve.coin_type == type_name::get<SUI>(), EWrongType);
+        if (!dynamic_field::exists_(&reserve.id, StakerKey {})) {
+            return
+        };
+
+        let balances: &Balances<P, SUI> = dynamic_field::borrow(&reserve.id, BalanceKey {});
+        if (liquidity_request.amount <= balance::value(&balances.available_amount)) {
+            return
+        };
+        let withdraw_amount = liquidity_request.amount - balance::value(&balances.available_amount);
+
+        let staker: &mut Staker<SPRUNGSUI> = dynamic_field::borrow_mut(&mut reserve.id, StakerKey {});
+        let sui = staker::withdraw(
+            staker,
+            withdraw_amount, 
+            system_state, 
+            ctx
+        );
+
+        let balances: &mut Balances<P, SUI> = dynamic_field::borrow_mut(
+            &mut reserve.id, 
+            BalanceKey {}
+        );
+        balance::join(&mut balances.available_amount, sui);
     }
 
     /// Borrow tokens from the reserve. A fee is charged on the borrowed amount
     public(package) fun borrow_liquidity<P, T>(
         reserve: &mut Reserve<P>, 
         amount: u64
-    ): (Balance<T>, u64) {
+    ): LiquidityRequest<P, T> {
         let borrow_fee = calculate_borrow_fee(reserve, amount);
         let borrow_amount_with_fees = amount + borrow_fee;
 
@@ -712,16 +845,11 @@ module suilend::reserve {
         );
 
         log_reserve_data(reserve);
-        let balances: &mut Balances<P, T> = dynamic_field::borrow_mut(
-            &mut reserve.id, 
-            BalanceKey {}
-        );
 
-        let mut receive_balance = balance::split(&mut balances.available_amount, borrow_amount_with_fees);
-        let fee_balance = balance::split(&mut receive_balance, borrow_fee);
-        balance::join(&mut balances.fees, fee_balance);
-
-        (receive_balance, borrow_amount_with_fees)
+        LiquidityRequest<P, T> {
+            amount: borrow_amount_with_fees,
+            fee: borrow_fee
+        }
     }
 
     public(package) fun repay_liquidity<P, T>(

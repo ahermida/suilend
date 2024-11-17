@@ -2,12 +2,13 @@
 
 [move]
 version = 3
-manifest_digest = "35F92FCDECB247F47BD4304AA29525DA91F7CF4EBCB8777527B825341BB52706"
-deps_digest = "060AD7E57DFB13104F21BE5F5C3759D03F0553FC3229247D9A7A6B45F50D03A3"
+manifest_digest = "AD56192FFF5ED5548BE6217C65D61F5064031E36DAD455951A91010E385F6E8D"
+deps_digest = "F9B494B64F0615AED0E98FC12A85B85ECD2BC5185C22D30E7F67786BB52E507C"
 dependencies = [
   { id = "Pyth", name = "Pyth" },
   { id = "Sui", name = "Sui" },
   { id = "liquid_staking", name = "liquid_staking" },
+  { id = "sprungsui", name = "sprungsui" },
 ]
 
 [[move.package]]
@@ -57,7 +58,15 @@ dependencies = [
   { id = "SuiSystem", name = "SuiSystem" },
 ]
 
+[[move.package]]
+id = "sprungsui"
+source = { local = "../sprungsui" }
+
+dependencies = [
+  { id = "Sui", name = "Sui" },
+]
+
 [move.toolchain-version]
-compiler-version = "1.35.3"
+compiler-version = "1.36.2"
 edition = "2024.beta"
 flavor = "sui"

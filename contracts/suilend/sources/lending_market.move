@@ -184,7 +184,7 @@ module suilend::lending_market {
 
     /// Cache the price from pyth onto the reserve object. this needs to be done for all
     /// relevant reserves used by an Obligation before any borrow/withdraw/liquidate can be performed.
-    public fun refresh_reserve_pyth_price<P>(
+    public fun refresh_reserve_price<P>(
         lending_market: &mut LendingMarket<P>, 
         reserve_array_index: u64,
         clock: &Clock,
@@ -903,7 +903,7 @@ module suilend::lending_market {
         lending_market.version = CURRENT_VERSION;
     }
 
-    public fun add_reserve_pyth<P, T>(
+    public fun add_reserve<P, T>(
         _: &LendingMarketOwnerCap<P>, 
         lending_market: &mut LendingMarket<P>, 
         price_info: &PriceInfoObject,
@@ -967,7 +967,7 @@ module suilend::lending_market {
         reserve::update_reserve_config<P>(reserve, config);
     }
     
-    public fun change_reserve_price_feed_pyth<P, T>(
+    public fun change_reserve_price_feed<P, T>(
         _: &LendingMarketOwnerCap<P>, 
         lending_market: &mut LendingMarket<P>, 
         reserve_array_index: u64,
@@ -1238,7 +1238,7 @@ module suilend::lending_market {
     }
 
     #[test_only]
-    public fun add_pyth_reserve_for_testing<P, T>(
+    public fun add_reserve_for_testing<P, T>(
         _: &LendingMarketOwnerCap<P>, 
         lending_market: &mut LendingMarket<P>, 
         price_info: &PriceInfoObject,

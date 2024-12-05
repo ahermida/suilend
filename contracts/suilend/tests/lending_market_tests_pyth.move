@@ -73,7 +73,7 @@ module suilend::lending_market_tests {
         mock_pyth::register<TEST_USDC>(&mut prices, test_scenario::ctx(&mut scenario));
         mock_pyth::register<TEST_SUI>(&mut prices, test_scenario::ctx(&mut scenario));
 
-        lending_market::add_reserve_pyth<LENDING_MARKET, TEST_USDC>(
+        lending_market::add_reserve<LENDING_MARKET, TEST_USDC>(
             &owner_cap,
             &mut lending_market,
             mock_pyth::get_price_obj<TEST_USDC>(&prices),
@@ -83,7 +83,7 @@ module suilend::lending_market_tests {
             test_scenario::ctx(&mut scenario)
         );
 
-        lending_market::add_reserve_pyth<LENDING_MARKET, TEST_USDC>(
+        lending_market::add_reserve<LENDING_MARKET, TEST_USDC>(
             &owner_cap,
             &mut lending_market,
             mock_pyth::get_price_obj<TEST_USDC>(&prices),
@@ -142,7 +142,7 @@ module suilend::lending_market_tests {
         bag::add(&mut type_to_index, type_name::get<TEST_SUI>(), 1);
         bag::add(&mut type_to_index, type_name::get<SUI>(), 2);
 
-        lending_market::add_reserve_pyth<LENDING_MARKET, TEST_USDC>(
+        lending_market::add_reserve<LENDING_MARKET, TEST_USDC>(
             &owner_cap,
             &mut lending_market,
             mock_pyth::get_price_obj<TEST_USDC>(&prices),
@@ -152,7 +152,7 @@ module suilend::lending_market_tests {
             test_scenario::ctx(scenario)
         );
 
-        lending_market::add_reserve_pyth<LENDING_MARKET, TEST_SUI>(
+        lending_market::add_reserve<LENDING_MARKET, TEST_SUI>(
             &owner_cap,
             &mut lending_market,
             mock_pyth::get_price_obj<TEST_SUI>(&prices),
@@ -162,7 +162,7 @@ module suilend::lending_market_tests {
             test_scenario::ctx(scenario)
         );
 
-        lending_market::add_pyth_reserve_for_testing<LENDING_MARKET, SUI>(
+        lending_market::add_reserve_for_testing<LENDING_MARKET, SUI>(
             &owner_cap,
             &mut lending_market,
             mock_pyth::get_price_obj<SUI>(&prices),
@@ -472,13 +472,13 @@ module suilend::lending_market_tests {
             test_scenario::ctx(&mut scenario)
         );
 
-        lending_market::refresh_reserve_pyth_price<LENDING_MARKET>(
+        lending_market::refresh_reserve_price<LENDING_MARKET>(
             &mut lending_market,
             *bag::borrow(&type_to_index, type_name::get<TEST_USDC>()),
             &clock,
             mock_pyth::get_price_obj<TEST_USDC>(&prices)
         );
-        lending_market::refresh_reserve_pyth_price<LENDING_MARKET>(
+        lending_market::refresh_reserve_price<LENDING_MARKET>(
             &mut lending_market,
             *bag::borrow(&type_to_index, type_name::get<TEST_SUI>()),
             &clock,
@@ -635,13 +635,13 @@ module suilend::lending_market_tests {
             test_scenario::ctx(&mut scenario)
         );
 
-        lending_market::refresh_reserve_pyth_price<LENDING_MARKET>(
+        lending_market::refresh_reserve_price<LENDING_MARKET>(
             &mut lending_market,
             *bag::borrow(&type_to_index, type_name::get<TEST_USDC>()),
             &clock,
             mock_pyth::get_price_obj<TEST_USDC>(&prices)
         );
-        lending_market::refresh_reserve_pyth_price<LENDING_MARKET>(
+        lending_market::refresh_reserve_price<LENDING_MARKET>(
             &mut lending_market,
             *bag::borrow(&type_to_index, type_name::get<TEST_SUI>()),
             &clock,
@@ -760,13 +760,13 @@ module suilend::lending_market_tests {
             test_scenario::ctx(&mut scenario)
         );
 
-        lending_market::refresh_reserve_pyth_price<LENDING_MARKET>(
+        lending_market::refresh_reserve_price<LENDING_MARKET>(
             &mut lending_market,
             *bag::borrow(&type_to_index, type_name::get<TEST_USDC>()),
             &clock,
             mock_pyth::get_price_obj<TEST_USDC>(&prices)
         );
-        lending_market::refresh_reserve_pyth_price<LENDING_MARKET>(
+        lending_market::refresh_reserve_price<LENDING_MARKET>(
             &mut lending_market,
             *bag::borrow(&type_to_index, type_name::get<TEST_SUI>()),
             &clock,
@@ -989,13 +989,13 @@ module suilend::lending_market_tests {
         mock_pyth::update_price<TEST_USDC>(&mut prices, 1, 0, &clock); // $1
         mock_pyth::update_price<TEST_SUI>(&mut prices, 1, 1, &clock); // $10
 
-        lending_market::refresh_reserve_pyth_price<LENDING_MARKET>(
+        lending_market::refresh_reserve_price<LENDING_MARKET>(
             &mut lending_market,
             *bag::borrow(&type_to_index, type_name::get<TEST_USDC>()),
             &clock,
             mock_pyth::get_price_obj<TEST_USDC>(&prices)
         );
-        lending_market::refresh_reserve_pyth_price<LENDING_MARKET>(
+        lending_market::refresh_reserve_price<LENDING_MARKET>(
             &mut lending_market,
             *bag::borrow(&type_to_index, type_name::get<TEST_SUI>()),
             &clock,
@@ -1162,13 +1162,13 @@ module suilend::lending_market_tests {
             test_scenario::ctx(&mut scenario)
         );
 
-        lending_market::refresh_reserve_pyth_price<LENDING_MARKET>(
+        lending_market::refresh_reserve_price<LENDING_MARKET>(
             &mut lending_market,
             *bag::borrow(&type_to_index, type_name::get<TEST_USDC>()),
             &clock,
             mock_pyth::get_price_obj<TEST_USDC>(&prices)
         );
-        lending_market::refresh_reserve_pyth_price<LENDING_MARKET>(
+        lending_market::refresh_reserve_price<LENDING_MARKET>(
             &mut lending_market,
             *bag::borrow(&type_to_index, type_name::get<TEST_SUI>()),
             &clock,
@@ -1186,7 +1186,7 @@ module suilend::lending_market_tests {
         test_utils::destroy(sui);
 
         mock_pyth::update_price<TEST_SUI>(&mut prices, 1, 2, &clock); // $10
-        lending_market::refresh_reserve_pyth_price<LENDING_MARKET>(
+        lending_market::refresh_reserve_price<LENDING_MARKET>(
             &mut lending_market,
             *bag::borrow(&type_to_index, type_name::get<TEST_SUI>()),
             &clock,
@@ -1323,13 +1323,13 @@ module suilend::lending_market_tests {
             test_scenario::ctx(&mut scenario)
         );
 
-        lending_market::refresh_reserve_pyth_price<LENDING_MARKET>(
+        lending_market::refresh_reserve_price<LENDING_MARKET>(
             &mut lending_market,
             *bag::borrow(&type_to_index, type_name::get<TEST_USDC>()),
             &clock,
             mock_pyth::get_price_obj<TEST_USDC>(&prices)
         );
-        lending_market::refresh_reserve_pyth_price<LENDING_MARKET>(
+        lending_market::refresh_reserve_price<LENDING_MARKET>(
             &mut lending_market,
             *bag::borrow(&type_to_index, type_name::get<TEST_SUI>()),
             &clock,
@@ -1437,13 +1437,13 @@ module suilend::lending_market_tests {
             test_scenario::ctx(&mut scenario)
         );
 
-        lending_market::refresh_reserve_pyth_price<LENDING_MARKET>(
+        lending_market::refresh_reserve_price<LENDING_MARKET>(
             &mut lending_market,
             *bag::borrow(&type_to_index, type_name::get<TEST_USDC>()),
             &clock,
             mock_pyth::get_price_obj<TEST_USDC>(&prices)
         );
-        lending_market::refresh_reserve_pyth_price<LENDING_MARKET>(
+        lending_market::refresh_reserve_price<LENDING_MARKET>(
             &mut lending_market,
             *bag::borrow(&type_to_index, type_name::get<TEST_SUI>()),
             &clock,
@@ -1554,7 +1554,7 @@ module suilend::lending_market_tests {
 
         let array_idx: u64 = *bag::borrow(&type_to_index, type_name::get<TEST_USDC>());
 
-        lending_market::change_reserve_price_feed_pyth<LENDING_MARKET, TEST_USDC>(
+        lending_market::change_reserve_price_feed<LENDING_MARKET, TEST_USDC>(
             &owner_cap,
             &mut lending_market,
             array_idx,
@@ -1893,13 +1893,13 @@ module suilend::lending_market_tests {
             test_scenario::ctx(&mut scenario)
         );
 
-        lending_market::refresh_reserve_pyth_price<LENDING_MARKET>(
+        lending_market::refresh_reserve_price<LENDING_MARKET>(
             &mut lending_market,
             *bag::borrow(&type_to_index, type_name::get<TEST_USDC>()),
             &clock,
             mock_pyth::get_price_obj<TEST_USDC>(&prices)
         );
-        lending_market::refresh_reserve_pyth_price<LENDING_MARKET>(
+        lending_market::refresh_reserve_price<LENDING_MARKET>(
             &mut lending_market,
             *bag::borrow(&type_to_index, type_name::get<SUI>()),
             &clock,
